@@ -86,17 +86,26 @@ async def load_extensions():
       if filename.endswith('.py'):
         await client.load_extension(f'cogs.{filename[:-3]}')
 
-if __name__ == "__main__":
-  # for filename in os.listdir('./cogs'):
-  #   if filename.endswith('.py'):
-  #     try:
-  #       client.load_extension(f'cogs.{filename[:-3]}')
-  #     except Exception as e:
-  #       print(f'Failed to load file {filename}: {str(e)}')
-  #       print(str(e))
-  loop = asyncio.get_event_loop()
-  loop.run_until_complete(load_extensions())
-  loop.close()
-  # load_extensions()
-  token = os.environ.get('LOCKOUT_BOT_TOKEN')
-  client.run(token)
+# if __name__ == "__main__":
+#   # for filename in os.listdir('./cogs'):
+#   #   if filename.endswith('.py'):
+#   #     try:
+#   #       client.load_extension(f'cogs.{filename[:-3]}')
+#   #     except Exception as e:
+#   #       print(f'Failed to load file {filename}: {str(e)}')
+#   #       print(str(e))
+#   loop = asyncio.get_event_loop()
+#   loop.run_until_complete(load_extensions())
+#   loop.close()
+#   # load_extensions()
+#   token = os.environ.get('LOCKOUT_BOT_TOKEN')
+#   client.run(token)
+
+
+async def main():
+    async with client:
+        await load_extensions()
+        token = os.environ.get('LOCKOUT_BOT_TOKEN')
+        await client.start(token)
+
+asyncio.run(main())
