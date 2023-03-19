@@ -45,7 +45,7 @@ class Help(commands.Cog):
         embeds = []
         for desc in content:
             embed = discord.Embed(description=headers + desc + footers, color=discord.Color.dark_magenta())
-            embed.set_author(name="Lockout commands help", icon_url=ctx.me.avatar_url)
+            embed.set_author(name="Lockout commands help", icon_url=ctx.me.avatar)
             embed.set_footer(
                 text="Use the prefix . before each command. For detailed usage about a particular command, type .help <command>")
             embed.add_field(name="GitHub repository", value=f"[GitHub]({GITHUB_LINK})",

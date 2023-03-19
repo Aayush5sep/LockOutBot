@@ -52,7 +52,7 @@ async def plot_graph(ctx, data, handle):
     plt.close()
     embed = Embed(title="Match rating for for %s" % handle, color=Color.blue())
     embed.set_image(url="attachment://plot.png")
-    embed.set_footer(text="Requested by " + str(ctx.author), icon_url=ctx.author.avatar_url)
+    embed.set_footer(text="Requested by " + str(ctx.author), icon_url=ctx.author.avatar)
     await ctx.channel.send(embed=embed, file=discord_file)
 
 
@@ -86,7 +86,7 @@ class Matches(commands.Cog):
         for cmd in match.commands:
             desc += f"`{cmd.name}`: **{cmd.brief}**\n"
         embed = discord.Embed(description=desc, color=discord.Color.dark_magenta())
-        embed.set_author(name="Lockout commands help", icon_url=ctx.me.avatar_url)
+        embed.set_author(name="Lockout commands help", icon_url=ctx.me.avatar)
         embed.set_footer(
             text="Use the prefix . before each command. For detailed usage about a particular command, type .help match <command>")
         embed.add_field(name="GitHub repository", value=f"[GitHub]({GITHUB_LINK})",
