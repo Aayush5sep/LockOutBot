@@ -513,5 +513,5 @@ class Round(commands.Cog):
         await ctx.send(embed=discord_.round_problems_embed(round_info))
 
 
-def setup(client):
-    client.add_cog(Round(client))
+async def setup(client):
+    await client.add_cog(Round(client))

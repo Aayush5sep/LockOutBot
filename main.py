@@ -80,14 +80,22 @@ async def on_command_error(ctx: discord.ext.commands.Context, error: Exception):
         await logging_channel.send(desc)
 
 
-if __name__ == "__main__":
+async def load_extensions():
     for filename in os.listdir('./cogs'):
-        if filename.endswith('.py'):
-            try:
-                client.load_extension(f'cogs.{filename[:-3]}')
-            except Exception as e:
-                print(f'Failed to load file {filename}: {str(e)}')
-                print(str(e))
+      if filename.endswith('.py'):
+        await client.load_extension(f'cogs.{filename[:-3]}')
 
-    token = os.environ.get('LOCKOUT_BOT_TOKEN')
-    client.run(token)
+if __name__ == "__main__":
+  # for filename in os.listdir('./cogs'):
+  #   if filename.endswith('.py'):
+  #     try:
+  #       client.load_extension(f'cogs.{filename[:-3]}')
+  #     except Exception as e:
+  #       print(f'Failed to load file {filename}: {str(e)}')
+  #       print(str(e))
+  loop = asyncio.get_event_loop()
+  loop.run_until_complete(load_extensions())
+  loop.close()
+  # load_extensions()
+  token = os.environ.get('LOCKOUT_BOT_TOKEN')
+  client.run(token)

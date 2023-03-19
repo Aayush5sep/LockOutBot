@@ -573,5 +573,5 @@ class Tournament(commands.Cog):
         await discord_.content_pagination(content, self.client, 10, "Recent tournaments", ctx, discord.Color.dark_purple())
 
 
-def setup(client):
-    client.add_cog(Tournament(client))
+async def setup(client):
+    await client.add_cog(Tournament(client))

@@ -515,5 +515,5 @@ class Matches(commands.Cog):
         await paginator.Paginator(data, ["User", "Rating"], f"Match Ratings", 10).paginate(ctx, self.client)
 
 
-def setup(client):
-    client.add_cog(Matches(client))
+async def setup(client):
+    await client.add_cog(Matches(client))

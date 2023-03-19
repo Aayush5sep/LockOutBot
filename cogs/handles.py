@@ -221,5 +221,5 @@ class Handles(commands.Cog):
         await paginator.Paginator(data, ["User", "Handle", "Rating"], f"Handle List", HANDLES_PER_PAGE).paginate(ctx, self.client)
 
 
-def setup(client):
-    client.add_cog(Handles(client))
+async def setup(client):
+    await client.add_cog(Handles(client))
