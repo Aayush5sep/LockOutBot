@@ -11,7 +11,7 @@ from utils import tasks
 from constants import AUTO_UPDATE_TIME
 
 intents = discord.Intents.default()
-intents.members = False
+intents.message_content = True
 client = Bot(case_insensitive=True, description="Lockout Bot", command_prefix=when_mentioned_or("."), intents=intents)
 
 logging_channel = None
