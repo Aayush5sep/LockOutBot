@@ -166,16 +166,16 @@ class Round(commands.Cog):
     async def ongoing(self, ctx):
         data = self.db.get_all_rounds(ctx.guild.id)
 
-        content = discord_.ongoing_rounds_embed(data)
 
-        if len(content) == 0:
+        if len(data) == 0:
             await discord_.send_message(ctx, f"No ongoing rounds")
             return
+        content = discord_.ongoing_rounds_embed(data)
 
         currPage = 0
         totPage = math.ceil(len(content) / ROUNDS_PER_PAGE)
         text = '\n'.join(content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
-        embed = discord.Embed(description=text, color=discord.Color.blurple())
+        embed = discord.Embed(description=f"{text}", color=discord.Color.blurple())
         embed.set_author(name="Ongoing Rounds")
         embed.set_footer(text=f"Page {currPage + 1} of {totPage}")
         message = await ctx.send(embed=embed)
@@ -206,7 +206,7 @@ class Round(commands.Cog):
                     currPage = totPage - 1
                 text = '\n'.join(
                     content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
-                embed = discord.Embed(description=text, color=discord.Color.blurple())
+                embed = discord.Embed(description=f"{text}", color=discord.Color.blurple())
                 embed.set_author(name="Ongoing rounds")
                 embed.set_footer(text=f"Page {currPage + 1} of {totPage}")
                 await message.edit(embed=embed)
@@ -342,10 +342,10 @@ class Round(commands.Cog):
 
                 if resp[1]:
                     round_info = self.db.get_round_info(round.guild, round.users)
-                    ranklist = updation.round_score(list(map(int, round_info.users.split())),
+                    ranklist = await updation.round_score(list(map(int, round_info.users.split())),
                                            list(map(int, round_info.status.split())),
                                            list(map(int, round_info.times.split())))
-                    eloChanges = elo.calculateChanges([[(await discord_.fetch_member(ctx.guild, user.id)), user.rank, self.db.get_match_rating(round_info.guild, user.id)[-1]] for user in ranklist])
+                    eloChanges = await elo.calculateChanges([[(await discord_.fetch_member(ctx.guild, user.id)), user.rank, self.db.get_match_rating(round_info.guild, user.id)[-1]] for user in ranklist])
 
                     for id in list(map(int, round_info.users.split())):
                         self.db.add_rating_update(round_info.guild, id, eloChanges[id][0])

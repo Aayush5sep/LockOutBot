@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup as soup
 from urllib.request import urlopen as uReq
 
 
-def run():
+async def run():
     dict = {}
     for pp in range(1, 16):
         url = f"https://codeforces.com/contests/page/{pp}"

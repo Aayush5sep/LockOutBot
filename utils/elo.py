@@ -73,7 +73,7 @@ class ELOMatch:
 
 
 # ranklist = [[DiscordUser, rank, elo]]
-def calculateChanges(ranklist):
+async def calculateChanges(ranklist):
     ELO = ELOMatch()
     for player in ranklist:
         ELO.addPlayer(player[0].id, player[1], player[2])

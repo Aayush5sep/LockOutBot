@@ -11,37 +11,14 @@ cf = cf_api.CodeforcesAPI()
 authors = None
 
 
-def isNonStandard(id):
-    names = [
-        'wild', 'fools', 'unrated', 'surprise', 'unknown', 'friday', 'q#', 'testing',
-        'marathon', 'kotlin', 'onsite', 'experimental', 'abbyy']
-    contest_name = db.get_contest_name(id)
-    for x in names:
-        if x in contest_name.lower():
-            return True
-    return False
 
 
-def isAuthor(handles, problem):
-    if str(problem.id) not in authors:
-        return False
-    for handle in handles:
-        if handle in authors[str(problem.id)]:
-            return True
-    return False
-
-
-def filter_problems(all_problems, user_problems, handles):
-    with open('./data/authors.json') as f:
-        global authors
-        authors = json.load(f)
+async def filter_problems(all_problems, user_problems):
     unsolved = []
     names = [x.name for x in user_problems]
     names.sort()
 
     for problem in all_problems:
-        if isNonStandard(problem.id) or isAuthor(handles, problem):
-            continue
 
         found = False
         l, r = 0, len(names) - 1
@@ -72,7 +49,7 @@ async def find_problems(handles, ratings):
 
     user_problems = list(set(user_problems))
 
-    unsolved_problems = filter_problems(all_problems, user_problems, handles)
+    unsolved_problems = await filter_problems(all_problems, user_problems)
 
     selected = []
     for x in ratings:
@@ -88,7 +65,7 @@ async def find_problems(handles, ratings):
     return [True, selected]
 
 
-def get_solve_time(sub, id, index):
+async def get_solve_time(sub, id, index):
     best = 1e18
     for x in sub:
         if x.id == int(id) and x.index == index:

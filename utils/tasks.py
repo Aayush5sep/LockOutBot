@@ -46,7 +46,7 @@ async def update_matches(client):
                     embed=discord_.match_problems_embed(db.get_match_info(guild.id, match.p1_id)))
 
             if resp[1]:
-                a, b = updation.match_score(resp[2])
+                a, b = await updation.match_score(resp[2])
                 p1_rank, p2_rank = 1 if a >= b else 2, 1 if b >= a else 2
                 ranklist = []
                 ranklist.append([await discord_.fetch_member(guild, match.p1_id), p1_rank,
@@ -54,7 +54,7 @@ async def update_matches(client):
                 ranklist.append([await discord_.fetch_member(guild, match.p2_id), p2_rank,
                                  db.get_match_rating(guild.id, match.p2_id)[-1]])
                 ranklist = sorted(ranklist, key=itemgetter(1))
-                res = elo.calculateChanges(ranklist)
+                res = await elo.calculateChanges(ranklist)
 
                 db.add_rating_update(guild.id, match.p1_id, res[match.p1_id][0])
                 db.add_rating_update(guild.id, match.p2_id, res[match.p2_id][0])
@@ -81,7 +81,7 @@ async def update_rounds(client):
     rounds = db.get_all_rounds()
     global api
     if api is None:
-        api = challonge_api.ChallongeAPI(client)
+        api = await challonge_api.ChallongeAPI(client)
     for round in rounds:
         try:
             guild = client.get_guild(round.guild)
@@ -109,10 +109,10 @@ async def update_rounds(client):
 
             if resp[1]:
                 round_info = db.get_round_info(round.guild, round.users)
-                ranklist = updation.round_score(list(map(int, round_info.users.split())),
+                ranklist = await updation.round_score(list(map(int, round_info.users.split())),
                                                 list(map(int, round_info.status.split())),
                                                 list(map(int, round_info.times.split())))
-                eloChanges = elo.calculateChanges([[(await discord_.fetch_member(guild, user.id)), user.rank,
+                eloChanges = await elo.calculateChanges([[(await discord_.fetch_member(guild, user.id)), user.rank,
                                                     db.get_match_rating(round_info.guild, user.id)[-1]] for user in
                                                    ranklist])
 
@@ -218,7 +218,7 @@ async def update_ratings(client):
         await logging_channel.send(f"Error while updating ratings: {str(traceback.format_exc())}")
 
 
-def isNonStandard(contest_name):
+async def isNonStandard(contest_name):
     names = [
         'wild', 'fools', 'unrated', 'surprise', 'unknown', 'friday', 'q#', 'testing',
         'marathon', 'kotlin', 'onsite', 'experimental', 'abbyy']
@@ -244,12 +244,12 @@ async def update_problemset(client):
     try:
         for contest in contest_list:
             mapping[contest['id']] = contest['name']
-            if contest['id'] not in contest_id and contest['phase'] == "FINISHED" and not isNonStandard(contest['name']):
+            if contest['id'] not in contest_id and contest['phase'] == "FINISHED" and not await isNonStandard(contest['name']):
                 con_cnt += 1
                 db.add_contest(contest['id'], contest['name'])
 
         for problem in problem_list:
-            if problem['contestId'] in mapping and not isNonStandard(mapping[problem['contestId']]) and 'rating' in problem and problem['contestId'] not in problem_id:
+            if problem['contestId'] in mapping and not await isNonStandard(mapping[problem['contestId']]) and 'rating' in problem and problem['contestId'] not in problem_id:
                 prob_cnt += 1
                 db.add_problem(problem['contestId'], problem['index'], problem['name'], problem['type'], problem['rating'])
         await logging_channel.send(f"Problemset Updated, added {con_cnt} new contests and {prob_cnt} new problems")
@@ -261,7 +261,7 @@ async def scrape_authors(client):
     logging_channel = await client.fetch_channel(os.environ.get("LOGGING_CHANNEL"))
     await logging_channel.send("Scraping contest author list...")
     try:
-        scraper.run()
+        await scraper.run()
         await logging_channel.send("Done")
     except Exception as e:
         await logging_channel.send(f"Error while scraping {str(traceback.format_exc())}")
