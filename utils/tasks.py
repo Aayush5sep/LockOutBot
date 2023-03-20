@@ -43,7 +43,7 @@ async def update_matches(client):
 
             if not resp[1] and len(resp[0]) > 0:
                 await channel.send(
-                    embed=discord_.match_problems_embed(db.get_match_info(guild.id, match.p1_id)))
+                    embed= await discord_.match_problems_embed(db.get_match_info(guild.id, match.p1_id)))
 
             if resp[1]:
                 a, b = await updation.match_score(resp[2])
@@ -81,8 +81,10 @@ async def update_rounds(client):
     rounds = db.get_all_rounds()
     global api
     if api is None:
-        api = await challonge_api.ChallongeAPI(client)
+        api = challonge_api.ChallongeAPI(client)
     for round in rounds:
+        if round.active == 0:
+            continue
         try:
             guild = client.get_guild(round.guild)
             resp = await updation.update_round(round)
@@ -119,7 +121,7 @@ async def update_rounds(client):
                 for id in list(map(int, round_info.users.split())):
                     db.add_rating_update(round_info.guild, id, eloChanges[id][0])
 
-                db.delete_round(round_info.guild, round_info.users)
+                db.delete_round(round_info.guild,round_info.users,round_info.active)
                 db.add_to_finished_rounds(round_info)
 
                 embed = discord.Embed(color=discord.Color.dark_magenta())
@@ -261,7 +263,7 @@ async def scrape_authors(client):
     logging_channel = await client.fetch_channel(os.environ.get("LOGGING_CHANNEL"))
     await logging_channel.send("Scraping contest author list...")
     try:
-        await scraper.run()
+        scraper.run()
         await logging_channel.send("Done")
     except Exception as e:
         await logging_channel.send(f"Error while scraping {str(traceback.format_exc())}")

@@ -9,7 +9,7 @@ from utils import cf_api, codeforces
 db = dbconn.DbConn()
 cf = cf_api.CodeforcesAPI()
 
-RECENT_SUBS_LIMIT = 50
+RECENT_SUBS_LIMIT = 10
 
 
 async def match_score(status):
@@ -28,7 +28,7 @@ async def match_score(status):
 
 
 async def no_change_possible(match_status):
-    a, b = await match_score(match_status)
+    a, b = match_score(match_status)
     left = 0
     for i in range(5):
         if match_status[i] == '0':
@@ -62,21 +62,21 @@ async def update_match(match_info):
             new_status += match_info.status[i]
             continue
 
-        time1, time2 = await codeforces.get_solve_time(sub1, int(problems[i].split('/')[0]), problems[i].split('/')[1]), \
-                       await codeforces.get_solve_time(sub2, int(problems[i].split('/')[0]), problems[i].split('/')[1])
+        time1 = await codeforces.get_solve_time(sub1, int(problems[i].split('/')[0]), problems[i].split('/')[1])
+        time2 = await codeforces.get_solve_time(sub2, int(problems[i].split('/')[0]), problems[i].split('/')[1])
 
         if time1 == -1 or time2 == -1:
             judging = True
             new_status += match_info.status[i]
             continue
 
-        if time1 < time2 and int(time1) <= int(match_info.time + 60 * match_info.duration):
+        if time1 < time2 and time1 <= match_info.time + 60 * match_info.duration:
             updates.append([i + 1, [match_info.p1_id]])
             new_status += '1'
-        elif time2 < time1 and int(time2) <= int(match_info.time + 60 * match_info.duration):
+        elif time2 < time1 and time2 <= match_info.time + 60 * match_info.duration:
             updates.append([i + 1, [match_info.p2_id]])
             new_status += '2'
-        elif time1 == time2 and int(time1) <= int(match_info.time + 60 * match_info.duration):
+        elif time1 == time2 and time1 <= match_info.time + 60 * match_info.duration:
             updates.append([i + 1, [match_info.p1_id, match_info.p2_id]])
             new_status += '3'
         else:
@@ -84,7 +84,7 @@ async def update_match(match_info):
 
     if len(updates):
         db.update_match_status(match_info, new_status)
-    if not judging and (int(enter_time) > int(match_info.time + 60 * match_info.duration) or await no_change_possible(new_status)):
+    if not judging and (enter_time > match_info.time + 60 * match_info.duration or no_change_possible(new_status)):
         over = True
 
     return [True, [updates, over, new_status]]

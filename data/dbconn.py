@@ -96,7 +96,14 @@ class DbConn:
                             duration BIGINT,
                             repeat BIGINT,
                             times TEXT,
-                            tournament BIGINT
+                            tournament BIGINT,
+                            active INT
+                    )
+                    """)
+        cmds.append("""
+                        CREATE TABLE IF NOT EXISTS div_regs(
+                            guild BIGINT,
+                            discord_id BIGINT
                     )
                     """)
         cmds.append("""
@@ -562,21 +569,99 @@ class DbConn:
         if len(data) > 0:
             return True
         return False
+    
+    def in_registrants(self, guild, user):
+        query = f"""
+                    SELECT * FROM div_regs
+                    WHERE
+                    discord_id = %s AND guild = %s
+                """
+        curr = self.conn.cursor()
+        curr.execute(query, (user, guild))
+        data = curr.fetchall()
+        curr.close()
+        if len(data) > 0:
+            return True
+        return False
 
-    def add_to_ongoing_round(self, ctx, users, rating, points, problems, duration, repeat, alts, tournament=0):
+    def add_to_ongoing_round(self, ctx, users, rating, points, problems, duration, repeat, active, tournament=0):
         query = f"""
                     INSERT INTO ongoing_rounds
                     VALUES
-                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
         curr = self.conn.cursor()
-        curr.execute(query, (ctx.guild.id, ' '.join([f"{x.id}" for x in users]), ' '.join(map(str, rating)),
+        curr.execute(query, (ctx.guild.id, ' '.join([f"{x}" for x in users]), ' '.join(map(str, rating)),
                              ' '.join(map(str, points)), int(time.time()), ctx.channel.id,
                              ' '.join([f"{x.id}/{x.index}" for x in problems]), ' '.join('0' for i in range(len(users))),
-                             duration, repeat, ' '.join(['0'] * len(users)), tournament))
-        self.add_to_alt_table(ctx, users, alts)
+                             duration, repeat, ' '.join(['0'] * len(users)), tournament, active))
         self.conn.commit()
         curr.close()
+
+    def update_ongoing_round(self, ctx, users, problems):
+        query = f"""
+                    UPDATE ongoing_rounds 
+                    SET
+                    users = %s,
+                    time = %s,
+                    problems = %s,
+                    status = %s,
+                    times = %s,
+                    active = %s
+                    WHERE
+                    guild = %s
+                """
+        curr = self.conn.cursor()
+        curr.execute(query, (' '.join([f"{x}" for x in users]), int(time.time()), ' '.join([f"{x.id}/{x.index}" for x in problems]), ' '.join('0' for i in range(len(users))), ' '.join(['0'] * len(users)), 2,ctx.guild.id))
+        self.conn.commit()
+        curr.close()
+
+    def add_to_regs(self,ctx):
+        query = f"""
+                    INSERT INTO div_regs
+                    VALUES
+                    (%s, %s)
+                """
+        curr = self.conn.cursor()
+        curr.execute(query, (ctx.guild.id, ctx.author.id))
+        self.conn.commit()
+        curr.close()
+
+    def remove_reg(self, guild, discord_id):
+        query = f"""
+                    DELETE FROM div_regs
+                    WHERE
+                    guild = %s AND discord_id = %s
+                """
+        curr = self.conn.cursor()
+        curr.execute(query, (guild, discord_id))
+        self.conn.commit()
+        curr.close()
+
+    def remove_reg_by_handle(self, guild, handle):
+        query = f"""
+                    DELETE FROM div_regs
+                    WHERE
+                    guild = %s AND discord_id = %s
+                """
+        curr = self.conn.cursor()
+        curr.execute(query, (guild, handle))
+        self.conn.commit()
+        res = curr.rowcount
+        curr.close()
+        return res
+
+    def get_round_registrants(self, guild):
+        query = f"""
+                    SELECT * FROM div_regs
+                    WHERE guild = %s
+                """
+        curr = self.conn.cursor()
+        curr.execute(query, (guild, ))
+        data = curr.fetchall()
+        curr.close()
+        Registrant = namedtuple('Registrant', 'guild, discord_id')
+        return [Registrant(x[0], x[1]) for x in data]
 
     def add_to_alt_table(self, ctx, users, handles):
         if len(handles) == 0:
@@ -616,8 +701,34 @@ class DbConn:
         curr.execute(query, (guild, f"%{users}%"))
         data = curr.fetchone()
         curr.close()
-        Round = namedtuple('Round', 'guild users rating points time channel problems status duration repeat times, tournament')
-        return Round(data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11])
+        Round = namedtuple('Round', 'guild users rating points time channel problems status duration repeat times, tournament, active')
+        return Round(data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11], data[12])
+
+    def get_tround_info(self, guild):
+        query = f"""
+                    SELECT * FROM ongoing_rounds
+                    WHERE
+                    guild = %s AND active <> %s
+                 """
+        curr = self.conn.cursor()
+        curr.execute(query, (guild, 1))
+        data = curr.fetchone()
+        curr.close()
+        Round = namedtuple('Round', 'guild users rating points time channel problems status duration repeat times, tournament, active')
+        return Round(data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11], data[12])
+
+    def get_all_trounds(self, guild):
+        query = f"""
+                    SELECT * FROM ongoing_rounds
+                    WHERE
+                    guild = %s AND active <> %s
+                """
+        curr = self.conn.cursor()
+        curr.execute(query,(guild,1))
+        res = curr.fetchall()
+        curr.close()
+        Round = namedtuple('Round', 'guild users rating points time channel problems status duration repeat times, tournament, active')
+        return [Round(data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11], data[12]) for data in res]
 
     def get_all_rounds(self, guild=None):
         query = f"""
@@ -629,8 +740,8 @@ class DbConn:
         curr.execute(query)
         res = curr.fetchall()
         curr.close()
-        Round = namedtuple('Round', 'guild users rating points time channel problems status duration repeat times, tournament')
-        return [Round(data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11]) for data in res]
+        Round = namedtuple('Round', 'guild users rating points time channel problems status duration repeat times, tournament, active')
+        return [Round(data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11], data[12]) for data in res]
 
     def update_round_status(self, guild, user, status, problems, timestamp):
         query = f"""
@@ -649,22 +760,33 @@ class DbConn:
         self.conn.commit()
         curr.close()
 
-    def delete_round(self, guild, user):
+    def delete_round(self, guild, user, tround):
         query = f"""
                     DELETE FROM ongoing_rounds
                     WHERE
-                    guild = %s AND users LIKE %s
+                    guild = %s AND users LIKE %s AND active = %s
                 """
         curr = self.conn.cursor()
-        curr.execute(query, (guild, f"%{user}%"))
+        curr.execute(query, (guild,f"{user}",1))
         self.conn.commit()
 
+        if tround == 1:
+            return
         query = f"""
-                    DELETE FROM ongoing_round_alts
+                    DELETE FROM ongoing_rounds
                     WHERE
-                    guild = %s AND USERS LIKE %s
+                    guild = %s AND active <> %s
                 """
-        curr.execute(query, (guild, f"%{user}%"))
+        curr = self.conn.cursor()
+        curr.execute(query, (guild,1))
+        self.conn.commit()
+        query = f"""
+                    DELETE FROM div_regs
+                    WHERE
+                    guild = %s
+                """
+        curr = self.conn.cursor()
+        curr.execute(query, (guild,))
         self.conn.commit()
         curr.close()
 

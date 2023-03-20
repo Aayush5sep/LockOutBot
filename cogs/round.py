@@ -8,17 +8,18 @@ from discord.ext import commands
 from discord.ext.commands import cooldown, BucketType
 
 from data import dbconn
-from utils import cf_api, discord_, codeforces, updation, elo, tournament_helper, challonge_api
+from utils import cf_api, discord_, codeforces, updation, elo, tournament_helper, challonge_api, paginator
 from constants import AUTO_UPDATE_TIME, ADMIN_PRIVILEGE_ROLES
 
 
-MAX_ROUND_USERS = 5
+MAX_ROUND_USERS = 100
 LOWER_RATING = 800
 UPPER_RATING = 3600
 MATCH_DURATION = [5, 180]
 MAX_PROBLEMS = 6
 MAX_ALTS = 5
 ROUNDS_PER_PAGE = 5
+MAX_REGISTRANTS = 100
 
 
 class Round(commands.Cog):
@@ -67,7 +68,7 @@ class Round(commands.Cog):
                 await discord_.send_message(ctx, f"Handle for {i.mention} not set! Use `.handle identify` to register")
                 return
             if self.db.in_a_round(ctx.guild.id, i.id):
-                await discord_.send_message(ctx, f"{i.mention} is already in a round!")
+                await discord_.send_message(ctx, f"{i.mention} is already in a round or registered in some!")
                 return
 
         embed = discord.Embed(description=f"{' '.join(x.mention for x in users)} react on the message with ✅ within 30 seconds to join the round. {'Since you are the only participant, this will be a practice round and there will be no rating changes' if len(users) == 1 else ''}",
@@ -130,14 +131,6 @@ class Round(commands.Cog):
                 await discord_.send_message(ctx, f"{i.name} is already in a round!")
                 return
 
-        alts = await discord_.get_alt_response(self.client, ctx, f"{ctx.author.mention} Do you want to add any alts? Type none if not applicable else type `alts: handle_1 handle_2 ...` You can add upto **{MAX_ALTS}** alt(s)", MAX_ALTS, 60, ctx.author)
-
-        if not alts:
-            await discord_.send_message(ctx, f"{ctx.author.mention} you took too long to decide")
-            return
-
-        alts = alts[1]
-
         tournament = 0
         if len(users) == 2 and (await tournament_helper.is_a_match(ctx.guild.id, users[0].id, users[1].id, self.api, self.db)):
             tournament = await discord_.get_time_response(self.client, ctx,
@@ -150,28 +143,203 @@ class Round(commands.Cog):
 
         await ctx.send(embed=discord.Embed(description="Starting the round...", color=discord.Color.green()))
 
-        problems = await codeforces.find_problems([self.db.get_handle(ctx.guild.id, x.id) for x in users]+alts, rating)
+
+        problems = await codeforces.find_problems([self.db.get_handle(ctx.guild.id, x.id) for x in users], rating)
         if not problems[0]:
             await discord_.send_message(ctx, problems[1])
             return
 
         problems = problems[1]
+        users = [user.id for user in users]
+        self.db.add_to_ongoing_round(ctx, users, rating, points, problems, duration, repeat, 1, tournament)
+        round_info = self.db.get_round_info(ctx.guild.id, users[0])
 
-        self.db.add_to_ongoing_round(ctx, users, rating, points, problems, duration, repeat, alts, tournament)
-        round_info = self.db.get_round_info(ctx.guild.id, users[0].id)
+        await ctx.send(embed= await discord_.round_problems_embed(round_info))
 
-        await ctx.send(embed=discord_.round_problems_embed(round_info))
+    @round.command(name="setup", brief="Setup a division.")
+    async def setup(self, ctx, division_name: str):
+
+        if not discord_.has_admin_privilege(ctx):
+            await discord_.send_message(ctx, f"{ctx.author.mention} you require 'manage server' permission or one of the "
+                                    f"following roles: {', '.join(ADMIN_PRIVILEGE_ROLES)} to use this command")
+            return
+        if len(division_name) not in range(1, 51):
+            await discord_.send_message(ctx, "The division name should be 50 character max")
+            return
+        if any([not ch.isalnum() and ch != ' ' for ch in division_name]):
+            await discord_.send_message(ctx, "The division name should contain only alpha-numeric characters")
+            return
+        if self.db.in_a_round(ctx.guild.id,ctx.author.id):
+            await discord_.send_message(ctx, "You are already in a round!")
+            return
+        if len(self.db.get_all_trounds(ctx.guild.id)) > 0:
+            await discord_.send_message(ctx, "Another round is already setup")
+            return
+
+        problem_cnt = await discord_.get_time_response(self.client, ctx, f"{ctx.author.mention} enter the number of problems between [1, {MAX_PROBLEMS}]", 30, ctx.author, [1, MAX_PROBLEMS])
+        if not problem_cnt[0]:
+            await discord_.send_message(ctx, f"{ctx.author.mention} you took too long to decide")
+            return
+        problem_cnt = problem_cnt[1]
+
+        duration = await discord_.get_time_response(self.client, ctx, f"{ctx.author.mention} enter the duration of match in minutes between {MATCH_DURATION}", 30, ctx.author, MATCH_DURATION)
+        if not duration[0]:
+            await discord_.send_message(ctx, f"{ctx.author.mention} you took too long to decide")
+            return
+        duration = duration[1]
+
+        rating = await discord_.get_seq_response(self.client, ctx, f"{ctx.author.mention} enter {problem_cnt} space seperated integers denoting the ratings of problems (between {LOWER_RATING} and {UPPER_RATING})", 60, problem_cnt, ctx.author, [LOWER_RATING, UPPER_RATING])
+        if not rating[0]:
+            await discord_.send_message(ctx, f"{ctx.author.mention} you took too long to decide")
+            return
+        rating = rating[1]
+
+        points = await discord_.get_seq_response(self.client, ctx, f"{ctx.author.mention} enter {problem_cnt} space seperated integer denoting the points of problems (between 100 and 10,000)", 60, problem_cnt, ctx.author, [100, 10000])
+        if not points[0]:
+            await discord_.send_message(ctx, f"{ctx.author.mention} you took too long to decide")
+            return
+        points = points[1]
+
+        repeat = await discord_.get_time_response(self.client, ctx, f"{ctx.author.mention} do you want a new problem to appear when someone solves a problem (type 1 for yes and 0 for no)", 30, ctx.author, [0, 1])
+        if not repeat[0]:
+            await discord_.send_message(ctx, f"{ctx.author.mention} you took too long to decide")
+            return
+        repeat = repeat[1]
+
+        tournament = 0
+
+        problems = []
+
+        self.db.add_to_ongoing_round(ctx, [], rating, points, problems, duration, repeat, 0, tournament)
+        self.db.add_to_regs(ctx)
+
+        desc = f"""
+               Initialised a round {division_name}. 
+               To register, type `.round register` (Max registrations: **{MAX_REGISTRANTS}**)
+               To unregister, type `.round unregister`
+               To start the round, type `.round begin`. This is a Moderator-only command. 
+               """
+        embed = discord.Embed(description=desc, color=discord.Color.green())
+        embed.set_author(name=division_name)
+        await ctx.send(embed=embed)
+
+
+    @round.command(name="register", brief="Register for the round")
+    async def register(self, ctx):
+        round_info = None
+        try:
+            round_info = self.db.get_tround_info(ctx.guild.id)
+        except TypeError:
+            await discord_.send_message(ctx, "There is no ongoing round in the server currently")
+            return
+        except:
+            await discord_.send_message(ctx, "Some problem occured")
+            return
+        if not round_info:
+            await discord_.send_message(ctx, "There is no ongoing round in the server currently")
+            return
+        if round_info.active != 0:
+            await discord_.send_message(ctx, "The round has already begun")
+            return
+        if not self.db.get_handle(ctx.guild.id, ctx.author.id):
+            await discord_.send_message(ctx, "Your handle is not set, set your handle first and try again")
+            return
+        handle_info = self.db.get_handle_info(ctx.guild.id, ctx.author.id)
+        registrants = self.db.get_round_registrants(ctx.guild.id)
+        if self.db.in_registrants(ctx.guild.id,ctx.author.id):
+            await discord_.send_message(ctx, "You have already registered for the round")
+            return
+        if self.db.in_a_round(ctx.guild.id,ctx.author.id):
+            await discord_.send_message(ctx, "You are already in some round")
+            return
+        if len(registrants) == MAX_REGISTRANTS:
+            await discord_.send_message(ctx, "The round has already reached its max registrants limit!")
+            return
+
+        self.db.add_to_regs(ctx)
+
+        await ctx.send(embed=discord.Embed(description=f"Successfully registered for the round. `{MAX_REGISTRANTS-len(registrants)-1}` slots left.",
+                                           color=discord.Color.green()))
+        
+
+    @round.command(name="unregister", brief="Unregister from the round")
+    async def unregister(self, ctx):
+        round_info = None
+        try:
+            round_info = self.db.get_tround_info(ctx.guild.id)
+        except TypeError:
+            await discord_.send_message(ctx, "There is no ongoing round in the server currently")
+            return
+        except:
+            await discord_.send_message(ctx, "Some problem occured")
+            return
+        if not round_info:
+            await discord_.send_message(ctx, "There is no ongoing round in the server currently")
+            return
+        if round_info.active != 0:
+            await discord_.send_message(ctx, "The round has already begun")
+            return
+        registrants = self.db.get_round_registrants(ctx.guild.id)
+        if ctx.author.id not in [x.discord_id for x in registrants]:
+            await discord_.send_message(ctx, "You have not registered for the round")
+            return
+
+        self.db.remove_reg(ctx.guild.id, ctx.author.id)
+        await ctx.send(embed=discord.Embed(
+            description=f"Successfully unregistered from the round. `{MAX_REGISTRANTS - len(registrants) + 1}` slots left.",
+            color=discord.Color.green()))
+        
+    @round.command(name="_unregister", brief="Forcefully unregister someone from the round")
+    async def _unregister(self, ctx, *, handle: str):
+        if not discord_.has_admin_privilege(ctx):
+            await discord_.send_message(ctx, f"{ctx.author.mention} you require 'manage server' permission or one of the "
+                                    f"following roles: {', '.join(ADMIN_PRIVILEGE_ROLES)} to use this command")
+            return
+        round_info = None
+        try:
+            round_info = self.db.get_tround_info(ctx.guild.id)
+        except TypeError:
+            await discord_.send_message(ctx, "There is no ongoing round in the server currently")
+            return
+        except:
+            await discord_.send_message(ctx, "Some problem occured")
+            return
+        if not round_info:
+            await discord_.send_message(ctx, "There is no ongoing round in the server currently")
+            return
+        if round_info.active != 0:
+            await discord_.send_message(ctx, "The round has already begun")
+            return
+        registrants = self.db.get_round_registrants(ctx.guild.id)
+
+        res = self.db.remove_reg_by_handle(ctx.guild.id, ctx.message.mentions[0].id)
+        if not res:
+            await discord_.send_message(ctx, f"The user with handle `{handle}` has not registered for the round")
+            return
+        await ctx.send(embed=discord.Embed(
+            description=f"Successfully unregistered from the round. `{MAX_REGISTRANTS - len(registrants) + 1}` slots left.",
+            color=discord.Color.green()))
+        
+    @round.command(name="registrants", brief="View the list of users who have registered the round")
+    async def registrants(self, ctx):
+        registrants = self.db.get_round_registrants(ctx.guild.id)
+        if not registrants:
+            await discord_.send_message(ctx, "No registrations yet")
+            return
+
+        await paginator.Paginator([[str(i+1), self.db.get_handle(ctx.guild.id, registrants[i].discord_id), str(self.db.get_handle_info(ctx.guild.id,registrants[i].discord_id))] for i in range(len(registrants))], ["S No.", "Handle", "Rating"], "Registrants for the Lockout round", 15).paginate(ctx, self.client)
+
+
 
     @round.command(name="ongoing", brief="View ongoing rounds")
     async def ongoing(self, ctx):
         data = self.db.get_all_rounds(ctx.guild.id)
-
-
         if len(data) == 0:
             await discord_.send_message(ctx, f"No ongoing rounds")
             return
-        content = discord_.ongoing_rounds_embed(data)
-
+        
+        content = await discord_.ongoing_rounds_embed(data)
+        
         currPage = 0
         totPage = math.ceil(len(content) / ROUNDS_PER_PAGE)
         text = '\n'.join(content[currPage * ROUNDS_PER_PAGE: min(len(content), (currPage + 1) * ROUNDS_PER_PAGE)])
@@ -214,6 +382,32 @@ class Round(commands.Cog):
             except asyncio.TimeoutError:
                 break
 
+
+    @round.command(name="delete", brief="Delete the round")
+    async def delete_(self, ctx):
+        if not discord_.has_admin_privilege(ctx):
+            await discord_.send_message(ctx,
+                                        f"{ctx.author.mention} you require 'manage server' permission or one of the "
+                                        f"following roles: {', '.join(ADMIN_PRIVILEGE_ROLES)} to use this command")
+            return
+        round_info = None
+        try:
+            round_info = self.db.get_tround_info(ctx.guild.id)
+        except TypeError:
+            await discord_.send_message(ctx, "There is no ongoing round in the server currently")
+            return
+        except:
+            await discord_.send_message(ctx, "Some problem occured")
+            return
+        if not round_info:
+            await discord_.send_message(ctx, "There is no ongoing round in the server currently")
+            return
+
+        resp = await discord_.get_time_response(self.client, ctx, "Are you sure you want to delete the round? This action is irreversable. Type `1` for yes and `0` for no", 30, ctx.author, [0, 1])
+        if resp[0] and resp[1] == 1:
+            self.db.delete_round(ctx.guild.id,ctx.author.id,2)
+            await discord_.send_message(ctx, "round has been deleted")
+
     @round.command(brief="Invalidate a round (Admin/Mod/Lockout Manager only)")
     async def _invalidate(self, ctx, member: discord.Member):
         if not discord_.has_admin_privilege(ctx):
@@ -223,14 +417,15 @@ class Round(commands.Cog):
         if not self.db.in_a_round(ctx.guild.id, member.id):
             await discord_.send_message(ctx, f"{member.mention} is not in a round")
             return
-        self.db.delete_round(ctx.guild.id, member.id)
+        self.db.delete_round(ctx.guild.id, member.id,1)
         await discord_.send_message(ctx, f"Round deleted")
+
 
     @round.command(name="recent", brief="Show recent rounds")
     async def recent(self, ctx, user: discord.Member=None):
         data = self.db.get_recent_rounds(ctx.guild.id, str(user.id) if user else None)
 
-        content = discord_.recent_rounds_embed(data)
+        content = await discord_.recent_rounds_embed(data)
 
         if len(content) == 0:
             await discord_.send_message(ctx, f"No recent rounds")
@@ -278,39 +473,52 @@ class Round(commands.Cog):
             except asyncio.TimeoutError:
                 break
 
-#     @round.command(name="invalidate", brief="Invalidate your round")
-#     async def invalidate(self, ctx):
-#         if not self.db.in_a_round(ctx.guild.id, ctx.author.id):
-#             await ctx.send(f"{ctx.author.mention} you are not in a round")
-#             return
-#
-#         data = self.db.get_round_info(ctx.guild.id, ctx.author.id)
-#         try:
-#             users = [await ctx.guild.fetch_member(int(x)) for x in data[1].split()]
-#         except Exception:
-#             await ctx.send(f"{ctx.author.mention} some error occurred! Maybe one of the participants left the server")
-#             return
-#
-#         msg = await ctx.send(f"{' '.join([x.mention for x in users])} react within 30 seconds to invalidate the match")
-#         await msg.add_reaction("✅")
-#
-#         await asyncio.sleep(30)
-#         message = await ctx.channel.fetch_message(msg.id)
-#
-#         reaction = None
-#         for x in message.reactions:
-#             if x.emoji == "✅":
-#                 reaction = x
-#
-#         reacted = await reaction.users().flatten()
-#         for i in users:
-#             if i not in reacted:
-#                 await ctx.send(f"Unable to invalidate round, {i.name} did not react in time!")
-#                 return
-#
-#         self.db.delete_round(ctx.guild.id, ctx.author.id)
-#         await ctx.send(f"Match has been invalidated")
-#
+
+
+    @round.command(name="begin", brief="Begin the round", aliases=['start'])
+    async def begin(self, ctx):
+        if not discord_.has_admin_privilege(ctx):
+            await discord_.send_message(ctx, f"{ctx.author.mention} you require 'manage server' permission or one of the "
+                                    f"following roles: {', '.join(ADMIN_PRIVILEGE_ROLES)} to use this command")
+            return
+        round_info = self.db.get_all_trounds(ctx.guild.id)
+        if not round_info:
+            await discord_.send_message(ctx, "There is no ongoing round in the server currently")
+            return
+        if self.db.in_a_round(ctx.guild.id,ctx.author.id):
+            await discord_.send_message(ctx, "You are already in a round!")
+            return
+
+        round_info = round_info[0]
+        if round_info.active!=0:
+            await discord_.send_message(ctx, f"The round has already begun! Type `.round matches` or `.round info` to view details about the round")
+            return
+
+        registrants = self.db.get_round_registrants(ctx.guild.id)
+        if not registrants or len(registrants) < 2:
+            await discord_.send_message(ctx, "Not enough registrants for the round yet")
+            return
+
+        logging_channel = await self.client.fetch_channel(os.environ.get("LOGGING_CHANNEL"))
+
+        user_list = self.db.get_round_registrants(ctx.guild.id)
+        users = [user.discord_id for user in user_list]
+
+        problems = await codeforces.find_problems([self.db.get_handle(ctx.guild.id, x) for x in users], [int(rt) for rt in round_info.rating.split()])
+        if not problems[0]:
+            await discord_.send_message(ctx, problems[1])
+            return
+
+        problems = problems[1]
+
+        round_info = self.db.update_ongoing_round(ctx,users,problems)
+
+        round_info = self.db.get_tround_info(ctx.guild.id)
+
+        await ctx.send(embed= await discord_.round_problems_embed(round_info))
+
+
+
     @round.command(brief="Update matches status for the server")
     @cooldown(1, AUTO_UPDATE_TIME, BucketType.guild)
     async def update(self, ctx):
@@ -318,6 +526,8 @@ class Round(commands.Cog):
         rounds = self.db.get_all_rounds(ctx.guild.id)
 
         for round in rounds:
+            if round.active == 0:
+                continue
             try:
                 resp = await updation.update_round(round)
                 if not resp[0]:
@@ -338,7 +548,7 @@ class Round(commands.Cog):
 
                 if not resp[1] and resp[2]:
                     new_info = self.db.get_round_info(round.guild, round.users)
-                    await channel.send(embed=discord_.round_problems_embed(new_info))
+                    await channel.send(embed= await discord_.round_problems_embed(new_info))
 
                 if resp[1]:
                     round_info = self.db.get_round_info(round.guild, round.users)
@@ -350,7 +560,7 @@ class Round(commands.Cog):
                     for id in list(map(int, round_info.users.split())):
                         self.db.add_rating_update(round_info.guild, id, eloChanges[id][0])
 
-                    self.db.delete_round(round_info.guild, round_info.users)
+                    self.db.delete_round(round_info.guild, round_info.users,round_info.active)
                     self.db.add_to_finished_rounds(round_info)
 
                     embed = discord.Embed(color=discord.Color.dark_magenta())
@@ -394,7 +604,7 @@ class Round(commands.Cog):
                                     await self.api.finish_tournament(res[1]['tournament_id'])
                                     await asyncio.sleep(3)
                                     winner_handle = await tournament_helper.get_winner(res[1]['tournament_id'], self.api)
-                                    await channel.send(embed=tournament_helper.tournament_over_embed(round_info.guild, winner_handle, self.db))
+                                    await channel.send(embed= await tournament_helper.tournament_over_embed(round_info.guild, winner_handle, self.db))
                                     self.db.add_to_finished_tournaments(self.db.get_tournament_info(round_info.guild), winner_handle)
                                     self.db.delete_tournament(round_info.guild)
 
@@ -411,7 +621,7 @@ class Round(commands.Cog):
             return
 
         round_info = self.db.get_round_info(ctx.guild.id, member.id)
-        await ctx.send(embed=discord_.round_problems_embed(round_info))
+        await ctx.send(embed= await discord_.round_problems_embed(round_info))
 
     @round.command(name="custom", brief="Challenge to a round with custom problemset")
     async def custom(self, ctx, *users: discord.Member):
@@ -508,9 +718,9 @@ class Round(commands.Cog):
 
         await ctx.send(embed=discord.Embed(description="Starting the round...", color=discord.Color.green()))
         self.db.add_to_ongoing_round(ctx, users, rating, points, problems, duration, 0, [], tournament)
-        round_info = self.db.get_round_info(ctx.guild.id, users[0].id)
+        round_info = self.db.get_round_info(ctx.guild.id,users)
 
-        await ctx.send(embed=discord_.round_problems_embed(round_info))
+        await ctx.send(embed= await discord_.round_problems_embed(round_info))
 
 
 async def setup(client):

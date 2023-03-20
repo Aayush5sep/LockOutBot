@@ -151,8 +151,8 @@ async def get_problems_response(client, ctx, message, time, length, author):
         return [False]
 
 
-def match_problems_embed(match_info):
-    a, b = match_score(match_info.status)
+async def match_problems_embed(match_info):
+    a, b = await match_score(match_info.status)
     problems = match_info.problems.split()
 
     points = [f"{100 * (i + 1)}" for i in range(5)]
@@ -177,12 +177,12 @@ def match_problems_embed(match_info):
     return embed
 
 
-def ongoing_matches_embed(data):
+async def ongoing_matches_embed(data):
     content = []
     for match in data:
         try:
             handle1, handle2 = db.get_handle(match.guild, match.p1_id), db.get_handle(match.guild, match.p2_id)
-            a, b = updation.match_score(match.status)
+            a, b = await updation.match_score(match.status)
             profile_url = "https://codeforces.com/profile/"
             content.append(f"{len(content)+1}. [{handle1}]({profile_url+handle1})(**{a}** points) vs (**{b}** points) [{handle2}]"
                            f"({profile_url+handle2}) | {match.rating} rated | Time left: {timeez(match.time+60*match.duration-int(time.time()))}")
@@ -191,12 +191,12 @@ def ongoing_matches_embed(data):
     return content
 
 
-def recent_matches_embed(data):
+async def recent_matches_embed(data):
     content = []
     for match in data:
         try:
             handle1, handle2 = db.get_handle(match.guild, match.p1_id), db.get_handle(match.guild, match.p2_id)
-            a, b = updation.match_score(match.status)
+            a, b = await updation.match_score(match.status)
             profile_url = "https://codeforces.com/profile/"
             content.append(f"{len(content)+1}. [{handle1}]({profile_url+handle1})(**{a}** points) vs (**{b}** points) [{handle2}]"
                            f"({profile_url+handle2}) {f'was won by **{handle1 if a>b else handle2}**' if a!=b else 'ended in a **draw**!'} | {match.rating} rated | {timeez(int(time.time())-match.time)} ago")
@@ -205,8 +205,8 @@ def recent_matches_embed(data):
     return content
 
 
-def round_problems_embed(round_info):
-    ranklist = round_score(list(map(int, round_info.users.split())), list(map(int, round_info.status.split())), list(map(int, round_info.times.split())))
+async def round_problems_embed(round_info):
+    ranklist = await round_score(list(map(int, round_info.users.split())), list(map(int, round_info.status.split())), list(map(int, round_info.times.split())))
 
     problems = round_info.problems.split()
     names = [f"[{db.get_problems(problems[i])[0].name}](https://codeforces.com/contest/{problems[i].split('/')[0]}"
@@ -225,17 +225,20 @@ def round_problems_embed(round_info):
     embed.add_field(name="Points", value='\n'.join(round_info.points.split()), inline=True)
     embed.add_field(name="Problem Name", value='\n'.join(names), inline=True)
     embed.add_field(name="Rating", value='\n'.join(round_info.rating.split()), inline=True)
-    embed.set_footer(text=f"Time left: {timeez((round_info.time + 60 * round_info.duration) - int(time.time()))}")
-
+    if round_info.active == 0:
+        embed.set_footer(text = f"\n**Duration(Yet To Start):** {round_info.duration}\n\n")
+    else:
+        embed.set_footer(text=f"Time left: {timeez((round_info.time + 60 * round_info.duration) - int(time.time()))}")
+    
     return embed
 
 
-def recent_rounds_embed(data):
+async def recent_rounds_embed(data):
     content = []
 
     for round in data:
         try:
-            ranklist = updation.round_score(list(map(int, round.users.split())), list(map(int, round.status.split())),
+            ranklist = await updation.round_score(list(map(int, round.users.split())), list(map(int, round.status.split())),
                                             list(map(int, round.times.split())))
             msg = ' vs '.join([f"[{db.get_handle(round.guild, user.id)}](https://codeforces.com/profile/{db.get_handle(round.guild, user.id)}) `Rank {user.rank}` `{user.points} Points`"
                                for user in ranklist])
@@ -249,18 +252,21 @@ def recent_rounds_embed(data):
     return content
 
 
-def ongoing_rounds_embed(data):
+async def ongoing_rounds_embed(data):
     content = []
 
     for round in data:
         try:
-            ranklist = updation.round_score(list(map(int, round.users.split())), list(map(int, round.status.split())),
+            ranklist = await updation.round_score(list(map(int, round.users.split())), list(map(int, round.status.split())),
                                             list(map(int, round.times.split())))
             msg = ' vs '.join([f"[{db.get_handle(round.guild, user.id)}](https://codeforces.com/profile/{db.get_handle(round.guild, user.id)}) `Rank {user.rank}` `{user.points} Points`"
                                for user in ranklist])
             msg += f"\n**Problem ratings:** {round.rating}"
             msg += f"\n**Score distribution** {round.points}"
-            msg += f"\n**Time left:** {timeez(60*round.duration + round.time - int(time.time()))}\n\n"
+            if round.active == 0:
+                msg += f"\n**Duration(Yet To Start):** {round.duration}\n\n"
+            else:
+                msg += f"\n**Time left:** {timeez(60*round.duration + round.time - int(time.time()))}\n\n"
             content.append(msg)
         except Exception:
             pass
