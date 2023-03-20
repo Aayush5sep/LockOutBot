@@ -2,9 +2,11 @@
 
 A codeforces discord bot to compete with your friends in lockout format. The bot is coded in Python and uses Postgresql to manage its database. To invite the bot to your server, click [here](https://discord.com/oauth2/authorize?client_id=669978762120790045&permissions=0&scope=bot) or join our discord [server](https://discord.gg/xP2UPUn).
 
-## Update (As of 1st September 2022)
+## Update (As of 20th March 2023)
 
-The public bot will no longer function properly. The GitHub repository is also archived. More details [here](https://gist.github.com/pseudocoder10/2f87fc097d5ee3a689cc3889cf5a4bd9)
+The bot has been redesigned with the new Open Registration Round Option added alongwith the previous challenge round.
+The .round functions have been changed. Other Commands will be also checked re-again for their working with the asynchronous initalization of Lockout Bot.
+Your support will be appreciated to upgrade this bot.
 
 ## Useful links
 
