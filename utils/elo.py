@@ -16,7 +16,7 @@ class ELOMatch:
     def __init__(self):
         self.players = []
 
-    def addPlayer(self, name, place, elo):
+    async def addPlayer(self, name, place, elo):
         player = ELOPlayer()
 
         player.name = name
@@ -25,21 +25,21 @@ class ELOMatch:
 
         self.players.append(player)
 
-    def getELO(self, name):
+    async def getELO(self, name):
         for p in self.players:
             if p.name == name:
                 return p.eloPost
 
         return 1500
 
-    def getELOChange(self, name):
+    async def getELOChange(self, name):
         for p in self.players:
             if p.name == name:
                 return p.eloChange
 
         return 0
 
-    def calculateELOs(self):
+    async def calculateELOs(self):
         n = len(self.players)
         K = 80 / max(1, (n - 1))
 
@@ -76,10 +76,10 @@ class ELOMatch:
 async def calculateChanges(ranklist):
     ELO = ELOMatch()
     for player in ranklist:
-        ELO.addPlayer(player[0].id, player[1], player[2])
-    ELO.calculateELOs()
+        await ELO.addPlayer(player[0].id, player[1], player[2])
+    await ELO.calculateELOs()
     res = {}
     for player in ranklist:
-        res[player[0].id] = [ELO.getELO(player[0].id), ELO.getELOChange(player[0].id)]
+        res[player[0].id] = [await ELO.getELO(player[0].id), await ELO.getELOChange(player[0].id)]
     return res
 

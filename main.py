@@ -16,6 +16,7 @@ intents.message_content = True
 client = Bot(case_insensitive=True, description="Lockout Bot", command_prefix=when_mentioned_or("."), intents=intents)
 
 logging_channel = None
+tz = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 
 
 @client.event
@@ -27,10 +28,10 @@ async def on_ready():
 
     scheduler = AsyncIOScheduler()
     scheduler.add_job(update, 'interval', seconds=AUTO_UPDATE_TIME)
-    scheduler.add_job(tasks.create_backup, CronTrigger(hour="0, 6, 12, 18", timezone="Asia/Kolkata"), [client])
-    scheduler.add_job(tasks.update_ratings, CronTrigger(minute="30", timezone="Asia/Kolkata"), [client])
-    scheduler.add_job(tasks.update_problemset, CronTrigger(hour="8", timezone="Asia/Kolkata"), [client])
-    scheduler.add_job(tasks.scrape_authors, CronTrigger(day_of_week="0", timezone="Asia/Kolkata"), [client])
+    scheduler.add_job(await tasks.create_backup, CronTrigger(hour="0, 6, 12, 18", timezone=tz), [client])
+    scheduler.add_job(await tasks.update_ratings, CronTrigger(minutes="55", timezone=tz), [client])
+    scheduler.add_job(await tasks.update_problemset, CronTrigger(hour="11", timezone=tz), [client])
+    scheduler.add_job(await tasks.scrape_authors, CronTrigger(day_of_week="0", timezone=tz), [client])
     scheduler.start()
 
 
