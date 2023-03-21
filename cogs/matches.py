@@ -91,11 +91,6 @@ class Matches(commands.Cog):
             text="Use the prefix . before each command. For detailed usage about a particular command, type .help match <command>")
         embed.add_field(name="GitHub repository", value=f"[GitHub]({GITHUB_LINK})",
                         inline=True)
-        embed.add_field(name="Bot Invite link",
-                        value=f"[Invite]({BOT_INVITE})",
-                        inline=True)
-        embed.add_field(name="Support Server", value=f"[Server]({SERVER_INVITE})",
-                        inline=True)
         return embed
 
     @commands.group(brief='Commands related to matches. Type .match for more details', invoke_without_command=True)
@@ -181,7 +176,7 @@ class Matches(commands.Cog):
         self.db.add_to_ongoing(data, int(time.time()), problems)
 
         match_info = self.db.get_match_info(ctx.guild.id, ctx.author.id)
-        await ctx.send(embed=discord_.match_problems_embed(match_info))
+        await ctx.send(embed= await discord_.match_problems_embed(match_info))
     
     @match.command(brief="Invalidate a match (Admin/Mod/Lockout Manager only)")
     async def _invalidate(self, ctx, member: discord.Member):
@@ -226,7 +221,7 @@ class Matches(commands.Cog):
             message = await self.client.wait_for('message', timeout=30, check=lambda
                 message: message.author == opponent and message.content.lower() == 'yes' and message.channel.id == ctx.channel.id)
             channel = self.client.get_channel(match.channel)
-            a, b = updation.match_score("00000")
+            a, b = await updation.match_score("00000")
             p1_rank, p2_rank = 1 if a >= b else 2, 1 if b >= a else 2
             ranklist = []
             ranklist.append([await discord_.fetch_member(ctx.guild, match.p1_id), p1_rank,
@@ -234,7 +229,7 @@ class Matches(commands.Cog):
             ranklist.append([await discord_.fetch_member(ctx.guild, match.p2_id), p2_rank,
                                  self.db.get_match_rating(ctx.guild.id, match.p2_id)[-1]])
             ranklist = sorted(ranklist, key=itemgetter(1))
-            res = elo.calculateChanges(ranklist)
+            res = await elo.calculateChanges(ranklist)
 
             self.db.add_rating_update(ctx.guild.id, match.p1_id, res[match.p1_id][0])
             self.db.add_rating_update(ctx.guild.id, match.p2_id, res[match.p2_id][0])
@@ -310,7 +305,7 @@ class Matches(commands.Cog):
             await discord_.send_message(ctx, "No recent matches")
             return
 
-        content = discord_.recent_matches_embed(data)
+        content = await discord_.recent_matches_embed(data)
 
         currPage = 0
         totPage = math.ceil(len(content) / RECENT_PER_PAGE)
@@ -361,7 +356,7 @@ class Matches(commands.Cog):
         if not self.db.in_a_match(ctx.guild.id, member.id):
             await discord_.send_message(ctx, f"User {member.mention} is not in a match!")
             return
-        await ctx.send(embed=discord_.match_problems_embed(self.db.get_match_info(ctx.guild.id, member.id)))
+        await ctx.send(embed= await discord_.match_problems_embed(self.db.get_match_info(ctx.guild.id, member.id)))
 
     @match.command(brief="Update matches status for the server")
     @cooldown(1, AUTO_UPDATE_TIME, BucketType.guild)
@@ -390,16 +385,16 @@ class Matches(commands.Cog):
                         color=discord.Color.blue()))
 
                 if not resp[1] and len(resp[0]) > 0:
-                    await channel.send(embed=discord_.match_problems_embed(self.db.get_match_info(ctx.guild.id, match.p1_id)))
+                    await channel.send(embed= await discord_.match_problems_embed(self.db.get_match_info(ctx.guild.id, match.p1_id)))
 
                 if resp[1]:
-                    a, b = updation.match_score(resp[2])
+                    a, b = await updation.match_score(resp[2])
                     p1_rank, p2_rank = 1 if a >= b else 2, 1 if b >= a else 2
                     ranklist = []
                     ranklist.append([await discord_.fetch_member(ctx.guild, match.p1_id), p1_rank, self.db.get_match_rating(ctx.guild.id, match.p1_id)[-1]])
                     ranklist.append([await discord_.fetch_member(ctx.guild, match.p2_id), p2_rank, self.db.get_match_rating(ctx.guild.id, match.p2_id)[-1]])
                     ranklist = sorted(ranklist, key=itemgetter(1))
-                    res = elo.calculateChanges(ranklist)
+                    res = await elo.calculateChanges(ranklist)
 
                     self.db.add_rating_update(ctx.guild.id, match.p1_id, res[match.p1_id][0])
                     self.db.add_rating_update(ctx.guild.id, match.p2_id, res[match.p2_id][0])

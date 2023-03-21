@@ -69,7 +69,7 @@ async def get_winner(tournament_id, api:challonge_api.ChallongeAPI):
     return None
 
 
-def tournament_over_embed(guild, winner, db: dbconn.DbConn):
+async def tournament_over_embed(guild, winner, db: dbconn.DbConn):
     tournament_info = db.get_tournament_info(guild)
 
     desc = f"The tournament has successfully completed! Congrats to **{winner}** for winning the tournament :tada:\n\n"

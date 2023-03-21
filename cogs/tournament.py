@@ -31,11 +31,6 @@ class Tournament(commands.Cog):
             text="Use the prefix . before each command. For detailed usage about a particular command, type .help <command>")
         embed.add_field(name="GitHub repository", value=f"[GitHub]({GITHUB_LINK})",
                         inline=True)
-        embed.add_field(name="Bot Invite link",
-                        value=f"[Invite]({BOT_INVITE})",
-                        inline=True)
-        embed.add_field(name="Support Server", value=f"[Server]({SERVER_INVITE})",
-                        inline=True)
         return embed
 
     @commands.group(brief='Commands related to tournaments! Type .tournament for more details', invoke_without_command=True, aliases=['tourney'])
@@ -428,7 +423,7 @@ class Tournament(commands.Cog):
             if await tournament_helper.validate_tournament_completion(tournament_info.guild, self.api, self.db):
                 await self.api.finish_tournament(tournament_info.id)
                 winner_handle = await tournament_helper.get_winner(tournament_info.id, self.api)
-                await ctx.send(embed=tournament_helper.tournament_over_embed(tournament_info.guild, winner_handle, self.db))
+                await ctx.send(embed= await tournament_helper.tournament_over_embed(tournament_info.guild, winner_handle, self.db))
                 self.db.delete_tournament(tournament_info.guild)
                 self.db.add_to_finished_tournaments(tournament_info, winner_handle)
 
@@ -512,7 +507,7 @@ class Tournament(commands.Cog):
                 await self.api.finish_tournament(tournament_info.id)
                 winner_handle = await tournament_helper.get_winner(tournament_info.id, self.api)
                 await ctx.send(
-                    embed=tournament_helper.tournament_over_embed(tournament_info.guild, winner_handle, self.db))
+                    embed= await tournament_helper.tournament_over_embed(tournament_info.guild, winner_handle, self.db))
                 self.db.delete_tournament(tournament_info.guild)
                 self.db.add_to_finished_tournaments(tournament_info, winner_handle)
 

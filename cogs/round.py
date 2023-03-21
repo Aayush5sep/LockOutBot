@@ -41,11 +41,6 @@ class Round(commands.Cog):
             text="Use the prefix . before each command. For detailed usage about a particular command, type .help match <command>")
         embed.add_field(name="GitHub repository", value=f"[GitHub](https://github.com/pseudocoder10/Lockout-Bot)",
                         inline=True)
-        embed.add_field(name="Bot Invite link",
-                        value=f"[Invite](https://discord.com/oauth2/authorize?client_id=669978762120790045&permissions=0&scope=bot)",
-                        inline=True)
-        embed.add_field(name="Support Server", value=f"[Server](https://discord.gg/xP2UPUn)",
-                        inline=True)
         return embed
 
     @commands.group(brief='Commands related to rounds! Type .round for more details', invoke_without_command=True)

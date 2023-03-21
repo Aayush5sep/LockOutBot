@@ -47,11 +47,6 @@ class Handles(commands.Cog):
             text="Use the prefix . before each command. For detailed usage about a particular command, type .help <command>")
         embed.add_field(name="GitHub repository", value=f"[GitHub]({GITHUB_LINK})",
                         inline=True)
-        embed.add_field(name="Bot Invite link",
-                        value=f"[Invite]({BOT_INVITE})",
-                        inline=True)
-        embed.add_field(name="Support Server", value=f"[Server]({SERVER_INVITE})",
-                        inline=True)
         return embed
 
     @commands.group(brief='Commands related to handles! Type .handle for more details', invoke_without_command=True)
